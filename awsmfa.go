@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/pquerna/otp/totp"
 	"gopkg.in/ini.v1"
 )
 
@@ -26,6 +28,7 @@ func main() {
 	token_arn := mfaConfig.Section("").Key("token_arn").String()
 	temp_user := mfaConfig.Section("").Key("temp_user").String()
 	lifetime := mfaConfig.Section("").Key("lifetime").MustInt64()
+	otp_secret := mfaConfig.Section("").Key("otp_secret").String()
 	if (token_arn == "") || (temp_user == "") || (lifetime < 900) || (lifetime > 3600) {
 		fmt.Printf(
 			"\nPlease edit %v to include the following lines\n\n"+
@@ -42,7 +45,7 @@ func main() {
 	params := &sts.GetSessionTokenInput{
 		DurationSeconds: aws.Int64(lifetime),
 		SerialNumber:    aws.String(token_arn),
-		TokenCode:       getPasscode(),
+		TokenCode:       getPasscode(otp_secret),
 	}
 
 	// Fetch the Session Token if we can
@@ -72,9 +75,17 @@ func main() {
 	fmt.Printf("Your temporary token will expire at %v\n", creds.Credentials.Expiration)
 }
 
-func getPasscode() *string {
-	var passcode string
-	fmt.Print("Enter passcode: ")
-	fmt.Scanln(&passcode)
-	return aws.String(passcode)
+func getPasscode(otp_secret string) *string {
+	if otp_secret == "" {
+		var passcode string
+		fmt.Print("Enter passcode: ")
+		fmt.Scanln(&passcode)
+		return aws.String(passcode)
+	} else {
+		fmt.Printf("Passcode: ")
+		time.Sleep(4 * time.Second)
+		code, _ := totp.GenerateCode(otp_secret, time.Now())
+		fmt.Printf("%v\n", code)
+		return aws.String(code)
+	}
 }
