@@ -24,11 +24,14 @@ func main() {
 		os.Exit(124)
 	}
 
-	// Validate the config
+	// Fetch the config
 	token_arn := mfaConfig.Section("").Key("token_arn").String()
 	temp_user := mfaConfig.Section("").Key("temp_user").String()
 	lifetime := mfaConfig.Section("").Key("lifetime").MustInt64()
 	otp_secret := mfaConfig.Section("").Key("otp_secret").String()
+	otp_delay := mfaConfig.Section("").Key("otp_delay").MustInt64(0)
+
+	// Validate the important bits of config
 	if (token_arn == "") || (temp_user == "") || (lifetime < 900) || (lifetime > 3600) {
 		fmt.Printf(
 			"\nPlease edit %v to include the following lines\n\n"+
@@ -45,7 +48,7 @@ func main() {
 	params := &sts.GetSessionTokenInput{
 		DurationSeconds: aws.Int64(lifetime),
 		SerialNumber:    aws.String(token_arn),
-		TokenCode:       getPasscode(otp_secret),
+		TokenCode:       getPasscode(otp_secret, otp_delay),
 	}
 
 	// Fetch the Session Token if we can
@@ -75,7 +78,7 @@ func main() {
 	fmt.Printf("Your temporary token will expire at %v\n", creds.Credentials.Expiration)
 }
 
-func getPasscode(otp_secret string) *string {
+func getPasscode(otp_secret string, otp_delay int64) *string {
 	if otp_secret == "" {
 		var passcode string
 		fmt.Print("Enter passcode: ")
@@ -83,7 +86,7 @@ func getPasscode(otp_secret string) *string {
 		return aws.String(passcode)
 	} else {
 		fmt.Printf("Passcode: ")
-		time.Sleep(4 * time.Second)
+		time.Sleep(time.Second * time.Duration(otp_delay))
 		code, _ := totp.GenerateCode(otp_secret, time.Now())
 		fmt.Printf("%v\n", code)
 		return aws.String(code)
