@@ -85,3 +85,10 @@ role_arn = arn:aws:iam::543210000000:role/development-admin
 source_profile = mfa
 region = eu-west-1
 ```
+
+Then, just execute aws cli commands as normal specifying the correct profile for the role you need
+
+```
+aws ec2 describe-instances --profile development
+```
+
